@@ -23,6 +23,7 @@ FloatingPane {
     property var sortedViewIds: []
     property var viewer: null
     readonly property alias sync3DSelected: m.sync3DSelected
+    property alias frameId: m.frame
 
     function updateReconstructionView() {
         if (_reconstruction && m.frame >= 0 && m.frame < sortedViewIds.length) {
@@ -88,7 +89,7 @@ FloatingPane {
         id: timer
 
         repeat: true
-        running: m.playing
+        running: m.playing && root.visible
         interval: 1000 / m.fps
 
         onTriggered: {
