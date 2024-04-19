@@ -22,10 +22,13 @@ FloatingPane {
     // Exposed properties
     property var sortedViewIds: []
     property var viewer: null
+    property bool isOutputSequence: false
     readonly property alias sync3DSelected: m.sync3DSelected
     property alias frameId: m.frame
 
     function updateReconstructionView() {
+        if (isOutputSequence)
+            return
         if (_reconstruction && m.frame >= 0 && m.frame < sortedViewIds.length) {
             if (m.syncSelected) {
                 _reconstruction.selectedViewId = sortedViewIds[m.frame];
@@ -35,6 +38,12 @@ FloatingPane {
                     _reconstruction.updateSelectedViewpoint(_reconstruction.pickedViewId);
                 }
             }
+        }
+    }
+
+    onIsOutputSequenceChanged: {
+        if (!isOutputSequence) {
+            frameId = 0
         }
     }
 
