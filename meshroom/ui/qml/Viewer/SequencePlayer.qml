@@ -25,7 +25,7 @@ FloatingPane {
     property bool isOutputSequence: false
     readonly property alias sync3DSelected: m.sync3DSelected
     property alias frameId: m.frame
-    property var frameRange: {"min" : 0, "max" : sortedViewIds.length - 1}
+    property var frameRange: {"min" : 0, "max" : 0}
 
     function updateReconstructionView() {
         if (isOutputSequence)
