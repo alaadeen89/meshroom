@@ -30,7 +30,7 @@ FloatingPane {
     function updateReconstructionView() {
         if (isOutputSequence)
             return
-        if (_reconstruction && m.frame >= frameRange.min && m.frame < frameRange+1) {
+        if (_reconstruction && m.frame >= frameRange.min && m.frame < frameRange.max+1) {
             if (m.syncSelected) {
                 _reconstruction.selectedViewId = sortedViewIds[m.frame];
             } else {
