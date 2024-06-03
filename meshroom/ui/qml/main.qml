@@ -436,6 +436,38 @@ ApplicationWindow {
         }
     }
 
+    Dialog {
+        id: pluginURLDialog
+        title: "Plugin URL"
+        height: 150
+        width: 300
+        standardButtons: StandardButton.Ok | StandardButton.Cancel
+        //focus: true  
+        Column {
+            anchors.fill: parent
+            Text {
+                text: "Plugin URL"
+                height: 40
+            }
+            TextField {
+                id: urlInput
+                width: parent.width * 0.75
+                focus: true
+            }
+        }
+        onButtonClicked: {
+        if (clickedButton==StandardButton.Ok) {
+            console.log("Accepted " + clickedButton)
+            if (_reconstruction.installPlugin(urlInput.text)) {
+                pluginInstalledDialog.open()
+            } else { 
+                pluginNotInstalledDialog.open()
+            }
+            } 
+        }
+    }
+    
+    //File browser for plugin
     FileDialog {
         id: importProjectDialog
         title: "Import Project"
@@ -443,6 +475,41 @@ ApplicationWindow {
         nameFilters: ["Meshroom Graphs (*.mg)"]
         onAccepted: {
             graphEditor.uigraph.importProject(importProjectDialog.fileUrl)
+        }
+    }
+    // dialogs for plugins 
+    MessageDialog {
+        id: pluginInstalledDialog
+        title: "Plugin installed"
+        modal: true
+        canCopy: false
+        Label {
+            text: "Plugin installed, please restart meshroom for the changes to take effect"
+        }
+    }
+
+    MessageDialog {
+        id: pluginNotInstalledDialog
+        title: "Plugin not installed"
+        modal: true
+        canCopy: false
+        Label {
+            text: "Something went wrong, plugin not installed"
+        }
+    }
+
+    // plugin installation from path or url
+    FileDialog {
+        id: intallPluginDialog
+        title: "Install Plugin"
+        selectExisting: false
+        selectFolder: true
+        onAccepted: {
+            if (_reconstruction.installPlugin(intallPluginDialog.fileUrl)) {
+                pluginInstalledDialog.open()
+            } else { 
+                pluginNotInstalledDialog.open()
+            }
         }
     }
 
@@ -824,6 +891,24 @@ ApplicationWindow {
                         importProjectDialog.open()
                     }
                 }
+
+                Action {
+                    id: installPluginFromFolderAction
+                    text: "Install Plugin From Local Folder"
+                    onTriggered: {
+                        initFileDialogFolder(intallPluginDialog)
+                        intallPluginDialog.open()
+                    }
+                }
+
+                Action {
+                    id: installPluginFromURLAction
+                    text: "Install Plugin From URL"
+                    onTriggered: {
+                        pluginURLDialog.open()
+                    }
+                }
+
 
                 MenuItem {
                     action: removeImagesFromAllGroupsAction

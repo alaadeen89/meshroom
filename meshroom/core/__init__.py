@@ -37,6 +37,7 @@ submitters = {}
 pipelineTemplates = {}
 
 
+
 def hashValue(value):
     """ Hash 'value' using sha1. """
     hashObject = hashlib.sha1(str(value).encode('utf-8'))
@@ -330,13 +331,17 @@ def loadPipelineTemplates(folder):
 
 meshroomFolder = os.path.dirname(os.path.dirname(__file__))
 
+#folders for plugins to be installed in
+pluginsNodesFolder = os.path.join(meshroomFolder, "plugins")
+pluginsPipelinesFolder = os.path.join(meshroomFolder, "pipelines")
+
 additionalNodesPath = os.environ.get("MESHROOM_NODES_PATH", "").split(os.pathsep)
 # filter empty strings
 additionalNodesPath = [i for i in additionalNodesPath if i]
 
 # Load plugins:
 # - Nodes
-nodesFolders = [os.path.join(meshroomFolder, 'nodes')] + additionalNodesPath
+nodesFolders = [os.path.join(meshroomFolder, 'nodes')] + [pluginsNodesFolder] + additionalNodesPath
 
 for f in nodesFolders:
     loadAllNodes(folder=f)
@@ -351,7 +356,7 @@ for sub in subs:
 # added to the environment variable
 additionalPipelinesPath = os.environ.get("MESHROOM_PIPELINE_TEMPLATES_PATH", "").split(os.pathsep)
 additionalPipelinesPath = [i for i in additionalPipelinesPath if i]
-pipelineTemplatesFolders = [os.path.join(meshroomFolder, 'pipelines')] + additionalPipelinesPath
+pipelineTemplatesFolders = [os.path.join(meshroomFolder, 'pipelines')] + additionalPipelinesPath + [pluginsPipelinesFolder]
 
 for f in pipelineTemplatesFolders:
     loadPipelineTemplates(f)
