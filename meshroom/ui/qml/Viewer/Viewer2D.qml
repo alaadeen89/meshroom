@@ -30,6 +30,9 @@ FocusScope {
     property bool enableSequencePlayer: enableSequencePlayerAction.checked
 
     readonly property alias sync3DSelected: sequencePlayer.sync3DSelected
+    property var sequence: []
+    property alias currentFrame: sequencePlayer.frameId
+    property alias frameRange: sequencePlayer.frameRange
 
     QtObject {
         id: m
@@ -181,7 +184,7 @@ FocusScope {
         }
 
         // node must have at least one output attribute with the image semantic
-        if (!node.hasImageOutput) {
+        if (!node.hasImageOutput && !node.hasSequenceOutput) {
             return false
         }
 
@@ -223,10 +226,10 @@ FocusScope {
         return undefined
     }
 
-
     function getImageFile() {
         // Entry point for getting the image file URL
 
+        let attr = displayedNode ? getAttributeByName(displayedNode, outputAttribute.name) : undefined
         if (useExternal) {
             return sourceExternal
         }
@@ -234,6 +237,11 @@ FocusScope {
         if (_reconstruction && (!displayedNode || outputAttribute.name == "gallery")) {
             let vp = getViewpoint(_reconstruction.pickedViewId)
             let path = vp ? vp.childAttribute("path").value : ""
+            return Filepath.stringToUrl(path)
+        }
+
+        if (_reconstruction && displayedNode && displayedNode.hasSequenceOutput && (attr.desc.semantic === "imageList" || attr.desc.semantic === "sequence")) {
+            var path = sequence[currentFrame-frameRange.min]
             return Filepath.stringToUrl(path)
         }
 
@@ -253,17 +261,50 @@ FocusScope {
         // ordered by path
 
         let objs = []
-        for (let i = 0; i < _reconstruction.viewpoints.count; i++) {
-            objs.push(_reconstruction.viewpoints.at(i))
-        }
-        objs.sort((a, b) => { return a.childAttribute("path").value < b.childAttribute("path").value ? -1 : 1; })
+        let attr = displayedNode ? getAttributeByName(displayedNode, outputAttribute.name) : undefined
 
-        let seq = [];
-        for (let i = 0; i < objs.length; i++) {
-            seq.push(Filepath.resolve(path_template, objs[i]))
-        }
+        if (displayedNode && displayedNode.hasSequenceOutput && (attr.desc.semantic === "imageList" || attr.desc.semantic === "sequence")) {
+            let sequence = Filepath.resolveSequence(path_template)
+            let ids = sequence[0]
+            let resolved = sequence[1]
 
-        return seq
+            // reset current frame to 0 if it is imageList but not sequence
+            if (attr.desc.semantic === "imageList") {
+                // concat in one array all sequences in resolved
+                resolved = [].concat.apply([], resolved)
+                frameRange.min = 0
+                frameRange.max = resolved.length-1
+                currentFrame = 0
+            }
+
+            if (attr.desc.semantic === "sequence") {
+                // if there is several sequences, take the first one
+                resolved = resolved[0]
+                ids = ids[0]
+                frameRange.min = ids[0]
+                frameRange.max = ids[ids.length-1]
+                currentFrame = frameRange.min
+            }
+            //order by path
+            resolved.sort()
+
+            return resolved
+        } else {
+            for (let i = 0; i < _reconstruction.viewpoints.count; i++) {
+                objs.push(_reconstruction.viewpoints.at(i))
+            }
+            objs.sort((a, b) => { return a.childAttribute("path").value < b.childAttribute("path").value ? -1 : 1; })
+            let seq = [];
+            for (let i = 0; i < objs.length; i++) {
+                seq.push(Filepath.resolve(path_template, objs[i]))
+            }
+
+            frameRange.min = 0
+            frameRange.max = seq.length-1
+            currentFrame = 0
+
+            return seq
+        }
     }
 
     function getSequence() {
@@ -297,15 +338,21 @@ FocusScope {
             // store attr name for output attributes that represent images
             for (var i = 0; i < displayedNode.attributes.count; i++) {
                 var attr = displayedNode.attributes.at(i)
-                if (attr.isOutput && attr.desc.semantic === "image" && attr.enabled) {
+                if (attr.isOutput && (attr.desc.semantic === "image" || attr.desc.semantic === "sequence" || attr.desc.semantic === "imageList") && attr.enabled) {
                     names.push(attr.name)
                 }
             }
         }
-        if (!displayedNode || displayedNode.isComputable) names.push("gallery")
-        outputAttribute.names = names
 
-        root.source = getImageFile()
+        if (!displayedNode || displayedNode.isComputable) names.push("gallery")
+
+        outputAttribute.names = names
+        if (displayedNode && !displayedNode.hasSequenceOutput) {
+            root.source = getImageFile()
+        } else {
+            root.sequence = getSequence()
+            enableSequencePlayerAction.checked = true
+        }
     }
 
     Connections {
@@ -457,11 +504,14 @@ FocusScope {
                                 'sfmRequired': Qt.binding(function() { return displayLensDistortionViewer.checked ? true : false }),
                                 'surface.msfmData': Qt.binding(function() { return (msfmDataLoader.status === Loader.Ready && msfmDataLoader.item != null && msfmDataLoader.item.status === 2) ? msfmDataLoader.item : null }),
                                 'canBeHovered': false,
-                                'idView': Qt.binding(function() { return (_reconstruction ? _reconstruction.selectedViewId : -1) }),
+                                'idView': Qt.binding(function() { return ((root.displayedNode && !root.displayedNode.hasSequenceOutput && _reconstruction) ? _reconstruction.selectedViewId : -1) }),
                                 'cropFisheye': false,
-                                'sequence': Qt.binding(function() { return ((root.enableSequencePlayer && _reconstruction && _reconstruction.viewpoints.count > 0) ? getSequence() : []) }),
+                                'sequence': Qt.binding(function() { return ((root.enableSequencePlayer && (_reconstruction || (root.displayedNode && root.displayedNode.hasSequenceOutput))) ? getSequence() : []) }),
                                 'targetSize': Qt.binding(function() { return floatImageViewerLoader.targetSize }),
-                                'useSequence': Qt.binding(function() { return root.enableSequencePlayer && !useExternal && _reconstruction })
+                                'useSequence': Qt.binding(function() { 
+                                    let attr = root.displayedNode ? getAttributeByName(root.displayedNode, outputAttribute.name) : undefined
+                                    return (root.enableSequencePlayer && !useExternal && (_reconstruction || ((root.displayedNode && root.displayedNode.hasSequenceOutput)) && (attr.desc.semantic === "imageList" || attr.desc.semantic === "sequence"))) 
+                                })
                                 })
                           } else {
                                 // Forcing the unload (instead of using Component.onCompleted to load it once and for all) is necessary since Qt 5.14
@@ -1333,6 +1383,7 @@ FocusScope {
 
                             onNameChanged: {
                                 root.source = getImageFile()
+                                root.sequence = getSequence()
                             }
                         }
 
@@ -1432,10 +1483,11 @@ FocusScope {
                     id: sequencePlayer
                     anchors.margins: 0
                     Layout.fillWidth: true
-                    sortedViewIds: (root.enableSequencePlayer && _reconstruction && _reconstruction.viewpoints.count > 0) ? buildOrderedSequence("<VIEW_ID>") : []
+                    sortedViewIds: { return (root.enableSequencePlayer && (root.displayedNode && root.displayedNode.hasSequenceOutput)) ? root.sequence : (_reconstruction && _reconstruction.viewpoints.count > 0) ? buildOrderedSequence("<VIEW_ID>") : [] }
                     viewer: floatImageViewerLoader.status === Loader.Ready ? floatImageViewerLoader.item : null
                     visible: root.enableSequencePlayer
                     enabled: root.enableSequencePlayer
+                    isOutputSequence: root.displayedNode && root.displayedNode.hasSequenceOutput
                 }
             }
         }

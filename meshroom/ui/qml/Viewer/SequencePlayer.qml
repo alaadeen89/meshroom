@@ -22,10 +22,15 @@ FloatingPane {
     // Exposed properties
     property var sortedViewIds: []
     property var viewer: null
+    property bool isOutputSequence: false
     readonly property alias sync3DSelected: m.sync3DSelected
+    property alias frameId: m.frame
+    property var frameRange: {"min" : 0, "max" : 0}
 
     function updateReconstructionView() {
-        if (_reconstruction && m.frame >= 0 && m.frame < sortedViewIds.length) {
+        if (isOutputSequence)
+            return
+        if (_reconstruction && m.frame >= frameRange.min && m.frame < frameRange.max+1) {
             if (m.syncSelected) {
                 _reconstruction.selectedViewId = sortedViewIds[m.frame];
             } else {
@@ -37,13 +42,24 @@ FloatingPane {
         }
     }
 
+    onIsOutputSequenceChanged: {
+        if (!isOutputSequence) {
+            frameId = frameRange.min
+        }
+    }
+
+    onSortedViewIdsChanged: {
+        frameSlider.from = frameRange.min
+        frameSlider.to = frameRange.max
+    }
+
     // Sequence player model:
     // - current frame
     // - data related to automatic sequence playing
     QtObject {
         id: m
 
-        property int frame: 0
+        property int frame: frameRange.min
         property bool syncSelected: true
         property bool sync3DSelected: false
         property bool playing: false
@@ -60,9 +76,9 @@ FloatingPane {
 
         onPlayingChanged: {
             syncSelected = syncViewersMenuItem.checked || !playing;
-            if(playing && (frame + 1 >= sortedViewIds.length))
+            if(playing && (frame + 1 >= frameRange+1))
             {
-                frame = 0;
+                frame = frameRange.min;
             }
             viewer.playback(playing);
         }
@@ -88,7 +104,7 @@ FloatingPane {
         id: timer
 
         repeat: true
-        running: m.playing
+        running: m.playing && root.visible
         interval: 1000 / m.fps
 
         onTriggered: {
@@ -97,9 +113,9 @@ FloatingPane {
                 return;
             }
             let nextIndex = m.frame + 1;
-            if (nextIndex == sortedViewIds.length) {
+            if (nextIndex == frameRange.max + 1) {
                 if (m.repeat) {
-                    m.frame = 0;
+                    m.frame = frameRange.min;
                     return;
                 }
                 else {
@@ -130,7 +146,7 @@ FloatingPane {
             ToolTip.text: "Previous Frame"
 
             onClicked: {
-                if (m.frame > 0) {
+                if (m.frame > frameRange.min) {
                     m.frame -= 1;
                 }
             }
@@ -163,7 +179,7 @@ FloatingPane {
             ToolTip.text: "Next Frame"
 
             onClicked: {
-                if (m.frame < sortedViewIds.length - 1) {
+                if (m.frame < frameRange.max) {
                     m.frame += 1;
                 }
             }
@@ -201,7 +217,7 @@ FloatingPane {
                     ToolTip.text: "Previous Frame"
 
                     onClicked: {
-                        if (m.frame > 0) {
+                        if (m.frame > frameRange.min) {
                             m.frame -= 1;
                         }
                     }
@@ -221,7 +237,7 @@ FloatingPane {
                     onEditingFinished: {
                         // We first assign the frame to the entered text even if it is an invalid frame number. We do it for extreme cases, for example without doing it, if we are at 0, and put a negative number, m.frame would be still 0 and nothing happens but we will still see the wrong number
                         m.frame = parseInt(text) 
-                        m.frame = Math.min((sortedViewIds.length - 1), Math.max(0, parseInt(text)));
+                        m.frame = Math.min(frameRange.max, Math.max(frameRange.min, parseInt(text)));
                         focus = false;
                     }
                 }
@@ -238,7 +254,7 @@ FloatingPane {
                     ToolTip.text: "Next Frame"
 
                     onClicked: {
-                        if (m.frame < sortedViewIds.length - 1) {
+                        if (m.frame < frameRange.max) {
                             m.frame += 1;
                         }
                     }
@@ -256,8 +272,8 @@ FloatingPane {
             snapMode: Slider.SnapAlways
             live: true
 
-            from: 0
-            to: sortedViewIds.length - 1
+            from: frameRange.min
+            to: frameRange.max
 
             onValueChanged: {
                 m.frame = value;
@@ -292,7 +308,7 @@ FloatingPane {
                     id: cacheView
 
                     model: viewer ? viewer.cachedFrames : []
-                    property real frameLength: sortedViewIds.length > 0 ? frameSlider.width / sortedViewIds.length : 0
+                    property real frameLength: sortedViewIds.length > 0 ? frameSlider.width / (frameRange.max-frameRange.min+1) : 0
 
                     Rectangle {
                         x: modelData.x * cacheView.frameLength

@@ -1180,6 +1180,15 @@ class BaseNode(BaseObject):
                 return True
         return False
 
+    def hasSequenceOutputAttribute(self):
+        """
+        Return True if at least one attribute has the 'sequence' semantic (and can thus be loaded in the 2D Viewer), False otherwise.
+        """
+        for attr in self._attributes:
+            if attr.enabled and attr.isOutput and (attr.desc.semantic == "sequence" or attr.desc.semantic == "imageList"):
+                return True
+        return False
+
     def has3DOutputAttribute(self):
         """
         Return True if at least one attribute is a File that can be loaded in the 3D Viewer, False otherwise.
@@ -1240,6 +1249,7 @@ class BaseNode(BaseObject):
 
     outputAttrEnabledChanged = Signal()
     hasImageOutput = Property(bool, hasImageOutputAttribute, notify=outputAttrEnabledChanged)
+    hasSequenceOutput = Property(bool, hasSequenceOutputAttribute, notify=outputAttrEnabledChanged)
     has3DOutput = Property(bool, has3DOutputAttribute, notify=outputAttrEnabledChanged)
 
 class Node(BaseNode):
